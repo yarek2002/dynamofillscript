@@ -214,24 +214,14 @@ else:
             except Exception as e:
                 continue
         
-        # Если точного совпадения не найдено, берем первое совпадение по комплекту чертежей
-        if res is None and first_match is not None:
-            res = first_match['col_a']
-            csv_sheet_number = first_match['sheet_num']
-            debug_info = " | Столбец A: '{}'".format(res[:100])
-            if csv_sheet_number:
-                csv_num_normalized = str(int(csv_sheet_number)) if csv_sheet_number.isdigit() else csv_sheet_number
-                debug_info += " | Извлечено из CSV: '{}' (норм: '{}')".format(csv_sheet_number, csv_num_normalized)
-                debug_info += " | Revit: '{}' (норм: '{}', для поиска: '{}') - совпадение только по комплекту. Проверено {} строк".format(
-                    sn_trimmed, revit_num_normalized, revit_num_for_csv_search or "N/A", len(found_matches))
-            else:
-                debug_info += " | Извлечено: НИЧЕГО"
-        
-        # Добавляем информацию о всех найденных совпадениях
-        if found_matches:
+        # Если точного совпадения не найдено - ничего не заполняем
+        # Добавляем информацию о всех найденных совпадениях для отладки
+        if not res and found_matches:
+            debug_info = " | Точного совпадения по номеру листа не найдено. Revit:'{}' (норм:'{}', поиск:'{}')".format(
+                sn_trimmed, revit_num_normalized or "N/A", revit_num_for_csv_search or "N/A")
             debug_info += " | Всего совпадений по комплекту: {}".format(len(found_matches))
-            if len(found_matches) > 1:
-                debug_info += " | Номера листов в CSV: {}".format([m['sheet_num'] for m in found_matches])
+            if len(found_matches) > 0:
+                debug_info += " | Номера листов в CSV: {}".format([m['sheet_num'] for m in found_matches[:10]])  # Показываем первые 10
         
         if res:
             try:
