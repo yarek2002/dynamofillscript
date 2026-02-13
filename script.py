@@ -99,6 +99,11 @@ else:
         debug_info = ""  # Отладочная информация
         sn_trimmed = sn.strip()  # Обрезаем пробелы из номера листа Revit
         found_matches = []  # Для отладки: все найденные совпадения
+        first_match = None  # Первое совпадение по комплекту чертежей
+        
+        # Нормализуем номер листа из Revit для сравнения
+        revit_num_normalized = str(int(sn_trimmed)) if sn_trimmed.isdigit() else sn_trimmed
+        
         for row in data_rows:
             if len(row) < 2:  # Минимум нужны столбцы A и B
                 continue
@@ -121,34 +126,49 @@ else:
                 # Сравниваем с ключом из Revit (без учета регистра)
                 if vk == drawing_set.lower():
                     # Сохраняем все найденные совпадения для отладки
-                    found_matches.append({
+                    match_info = {
                         'col_a': col_a[:80],
                         'sheet_num': sheet_num_from_csv
-                    })
+                    }
+                    found_matches.append(match_info)
                     
-                    # Отладочная информация: показываем что в столбце A и что извлекли
-                    debug_info = " | Столбец A: '{}'".format(col_a[:100])  # Первые 100 символов
+                    # Сохраняем первое совпадение (на случай, если точного совпадения по номеру листа не найдется)
+                    if first_match is None:
+                        first_match = {
+                            'col_a': col_a,
+                            'sheet_num': sheet_num_from_csv
+                        }
+                    
+                    # Проверяем совпадение номеров листов
                     if sheet_num_from_csv:
-                        debug_info += " | Извлечено из CSV: '{}'".format(sheet_num_from_csv)
-                        # Нормализуем для сравнения
-                        revit_num_normalized = str(int(sn_trimmed)) if sn_trimmed.isdigit() else sn_trimmed
                         csv_num_normalized = str(int(sheet_num_from_csv)) if sheet_num_from_csv.isdigit() else sheet_num_from_csv
-                        debug_info += " | Revit: '{}' (норм: '{}') vs CSV: '{}' (норм: '{}')".format(
-                            sn_trimmed, revit_num_normalized, sheet_num_from_csv, csv_num_normalized)
-                    else:
-                        debug_info += " | Извлечено: НИЧЕГО"
-                    
-                    res = col_a  # Орг.ЗамечаниеКЛисту берем из столбца A
-                    csv_sheet_number = sheet_num_from_csv  # Сохраняем для отладки
-                    break
+                        # Если номера листов совпадают - это точное совпадение, берем его
+                        if revit_num_normalized == csv_num_normalized:
+                            res = col_a
+                            csv_sheet_number = sheet_num_from_csv
+                            debug_info = " | Столбец A: '{}' | Точное совпадение по номеру листа!".format(col_a[:100])
+                            break
             except Exception as e:
                 continue
         
+        # Если точного совпадения не найдено, берем первое совпадение по комплекту чертежей
+        if res is None and first_match is not None:
+            res = first_match['col_a']
+            csv_sheet_number = first_match['sheet_num']
+            debug_info = " | Столбец A: '{}'".format(res[:100])
+            if csv_sheet_number:
+                csv_num_normalized = str(int(csv_sheet_number)) if csv_sheet_number.isdigit() else csv_sheet_number
+                debug_info += " | Извлечено из CSV: '{}' (норм: '{}')".format(csv_sheet_number, csv_num_normalized)
+                debug_info += " | Revit: '{}' (норм: '{}') - совпадение только по комплекту".format(
+                    sn_trimmed, revit_num_normalized)
+            else:
+                debug_info += " | Извлечено: НИЧЕГО"
+        
         # Добавляем информацию о всех найденных совпадениях
         if found_matches:
-            debug_info += " | Всего совпадений: {}".format(len(found_matches))
+            debug_info += " | Всего совпадений по комплекту: {}".format(len(found_matches))
             if len(found_matches) > 1:
-                debug_info += " | Номера листов: {}".format([m['sheet_num'] for m in found_matches])
+                debug_info += " | Номера листов в CSV: {}".format([m['sheet_num'] for m in found_matches])
         
         if res:
             try:
