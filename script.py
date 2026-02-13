@@ -51,6 +51,17 @@ def extract_drawing_set(col_b):
         return match.group(1)
     return None
 
+def normalize_sheet_number(sheet_num):
+    """Нормализует номер листа для сравнения (убирает ведущие нули)"""
+    if not sheet_num:
+        return None
+    try:
+        # Преобразуем в число и обратно в строку, чтобы убрать ведущие нули
+        return str(int(str(sheet_num).strip()))
+    except (ValueError, AttributeError):
+        # Если не число, возвращаем как есть
+        return str(sheet_num).strip()
+
 try:
     with codecs.open(path, 'r', encoding='utf-8-sig') as f:
         # Читаем CSV полностью
@@ -92,6 +103,9 @@ else:
         if not vk:
             continue
         
+        # Нормализуем номер листа из Revit для сравнения
+        revit_sheet_num = normalize_sheet_number(sn)
+        
         res = None
         for row in data_rows:
             if len(row) < 2:  # Минимум нужны столбцы A и B
@@ -104,13 +118,20 @@ else:
                 if not col_a or not col_b:
                     continue
                 
+                # Извлекаем номер листа из столбца A
+                csv_sheet_num = extract_sheet_number(col_a)
+                csv_sheet_num_normalized = normalize_sheet_number(csv_sheet_num) if csv_sheet_num else None
+                
                 # Извлекаем комплект чертежей из столбца B
                 drawing_set = extract_drawing_set(col_b)
                 if not drawing_set:
                     continue
                 
-                # Сравниваем с ключом из Revit (без учета регистра)
-                if vk == drawing_set.lower():
+                # Сравниваем и комплект чертежей, и номер листа
+                drawing_set_match = (vk == drawing_set.lower())
+                sheet_num_match = (revit_sheet_num == csv_sheet_num_normalized) if csv_sheet_num_normalized else False
+                
+                if drawing_set_match and sheet_num_match:
                     res = col_a  # Орг.ЗамечаниеКЛисту берем из столбца A
                     break
             except Exception as e:
