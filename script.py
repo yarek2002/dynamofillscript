@@ -107,6 +107,8 @@ else:
         revit_sheet_num = normalize_sheet_number(sn)
         
         res = None
+        comparison_info = []  # Для сбора информации о сравнениях
+        
         for row in data_rows:
             if len(row) < 2:  # Минимум нужны столбцы A и B
                 continue
@@ -118,11 +120,11 @@ else:
                 if not col_a or not col_b:
                     continue
                 
-                # Извлекаем номер листа из столбца A (например, "0120")
+                # Извлекаем номер листа из столбца A
                 csv_sheet_num = extract_sheet_number(col_a)
                 csv_sheet_num_normalized = normalize_sheet_number(csv_sheet_num) if csv_sheet_num else None
                 
-                # Извлекаем комплект чертежей из столбца B (например, "ОВ01.01.00")
+                # Извлекаем комплект чертежей из столбца B
                 drawing_set = extract_drawing_set(col_b)
                 if not drawing_set:
                     continue
@@ -130,6 +132,14 @@ else:
                 # Сравниваем и комплект чертежей, и номер листа
                 drawing_set_match = (vk == drawing_set.lower())
                 sheet_num_match = (revit_sheet_num == csv_sheet_num_normalized) if csv_sheet_num_normalized else False
+                
+                # Сохраняем информацию о сравнении для отчета
+                comp_msg = "  → CSV: Комплект='{}', Номер листа CSV='{}' (норм.='{}') vs Revit Номер='{}' (норм.='{}')".format(
+                    drawing_set, csv_sheet_num or "не найден", csv_sheet_num_normalized or "N/A",
+                    sn, revit_sheet_num or "N/A"
+                )
+                comp_msg += " | Комплект: {}, Номер: {}".format("✓" if drawing_set_match else "✗", "✓" if sheet_num_match else "✗")
+                comparison_info.append(comp_msg)
                 
                 if drawing_set_match and sheet_num_match:
                     res = col_a  # Орг.ЗамечаниеКЛисту берем из столбца A
@@ -142,6 +152,9 @@ else:
                 pt.Set(res)
                 updated += 1
                 report.append("✅ {}: Найдено '{}'".format(sn, res))
+                # Добавляем информацию о сравнении для успешных случаев
+                if comparison_info:
+                    report.append("   Сравнение: {}".format(comparison_info[-1] if comparison_info else ""))
                 # ✅ СЧИТАЕМ ТОЛЬКО ОБНОВЛЕННЫЕ ЛИСТЫ
                 if p_volume:
                     volume_name = p_volume.AsString() or "Без тома"
@@ -150,6 +163,13 @@ else:
                 report.append("⚠️ {}: Ошибка записи в параметр".format(sn))
         else:
             report.append("❓ {}: Ключ '{}' не найден в CSV".format(sn, vk))
+            # Добавляем информацию о сравнениях для неудачных случаев (первые 3 попытки)
+            if comparison_info:
+                report.append("   Попытки сравнения:")
+                for comp_msg in comparison_info[:3]:  # Показываем первые 3 попытки
+                    report.append(comp_msg)
+                if len(comparison_info) > 3:
+                    report.append("   ... и еще {} попыток".format(len(comparison_info) - 3))
     
     TransactionManager.Instance.TransactionTaskDone()
     
