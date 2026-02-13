@@ -51,17 +51,6 @@ def extract_drawing_set(col_b):
         return match.group(1)
     return None
 
-def normalize_sheet_number(sheet_num):
-    """Нормализует номер листа для сравнения (убирает ведущие нули)"""
-    if not sheet_num:
-        return None
-    try:
-        # Преобразуем в число и обратно в строку, чтобы убрать ведущие нули
-        return str(int(str(sheet_num).strip()))
-    except (ValueError, AttributeError):
-        # Если не число, возвращаем как есть
-        return str(sheet_num).strip()
-
 try:
     with codecs.open(path, 'r', encoding='utf-8-sig') as f:
         # Читаем CSV полностью
@@ -103,12 +92,8 @@ else:
         if not vk:
             continue
         
-        # Нормализуем номер листа из Revit для сравнения
-        revit_sheet_num = normalize_sheet_number(sn)
-        
         res = None
-        comparison_info = []  # Для сбора информации о сравнениях
-        
+        csv_sheet_number = None  # Номер листа из CSV для отладки
         for row in data_rows:
             if len(row) < 2:  # Минимум нужны столбцы A и B
                 continue
@@ -121,28 +106,17 @@ else:
                     continue
                 
                 # Извлекаем номер листа из столбца A
-                csv_sheet_num = extract_sheet_number(col_a)
-                csv_sheet_num_normalized = normalize_sheet_number(csv_sheet_num) if csv_sheet_num else None
+                sheet_num_from_csv = extract_sheet_number(col_a)
                 
                 # Извлекаем комплект чертежей из столбца B
                 drawing_set = extract_drawing_set(col_b)
                 if not drawing_set:
                     continue
                 
-                # Сравниваем и комплект чертежей, и номер листа
-                drawing_set_match = (vk == drawing_set.lower())
-                sheet_num_match = (revit_sheet_num == csv_sheet_num_normalized) if csv_sheet_num_normalized else False
-                
-                # Сохраняем информацию о сравнении для отчета
-                comp_msg = "  → CSV: Комплект='{}', Номер листа CSV='{}' (норм.='{}') vs Revit Номер='{}' (норм.='{}')".format(
-                    drawing_set, csv_sheet_num or "не найден", csv_sheet_num_normalized or "N/A",
-                    sn, revit_sheet_num or "N/A"
-                )
-                comp_msg += " | Комплект: {}, Номер: {}".format("✓" if drawing_set_match else "✗", "✓" if sheet_num_match else "✗")
-                comparison_info.append(comp_msg)
-                
-                if drawing_set_match and sheet_num_match:
+                # Сравниваем с ключом из Revit (без учета регистра)
+                if vk == drawing_set.lower():
                     res = col_a  # Орг.ЗамечаниеКЛисту берем из столбца A
+                    csv_sheet_number = sheet_num_from_csv  # Сохраняем для отладки
                     break
             except Exception as e:
                 continue
@@ -151,10 +125,19 @@ else:
             try:
                 pt.Set(res)
                 updated += 1
-                report.append("✅ {}: Найдено '{}'".format(sn, res))
-                # Добавляем информацию о сравнении для успешных случаев
-                if comparison_info:
-                    report.append("   Сравнение: {}".format(comparison_info[-1] if comparison_info else ""))
+                # Формируем информацию о сравнении номеров листов
+                sheet_info = "Номер листа Revit: '{}'".format(sn)
+                if csv_sheet_number:
+                    sheet_info += ", CSV: '{}'".format(csv_sheet_number)
+                    # Нормализуем для сравнения (убираем ведущие нули)
+                    revit_num_normalized = str(int(sn)) if sn.isdigit() else sn
+                    csv_num_normalized = str(int(csv_sheet_number)) if csv_sheet_number.isdigit() else csv_sheet_number
+                    match_status = "✓ Совпадают" if revit_num_normalized == csv_num_normalized else "✗ НЕ совпадают"
+                    sheet_info += " → {}".format(match_status)
+                else:
+                    sheet_info += ", CSV: не извлечен"
+                
+                report.append("✅ {}: Найдено '{}' | {}".format(sn, res, sheet_info))
                 # ✅ СЧИТАЕМ ТОЛЬКО ОБНОВЛЕННЫЕ ЛИСТЫ
                 if p_volume:
                     volume_name = p_volume.AsString() or "Без тома"
@@ -163,13 +146,6 @@ else:
                 report.append("⚠️ {}: Ошибка записи в параметр".format(sn))
         else:
             report.append("❓ {}: Ключ '{}' не найден в CSV".format(sn, vk))
-            # Добавляем информацию о сравнениях для неудачных случаев (первые 3 попытки)
-            if comparison_info:
-                report.append("   Попытки сравнения:")
-                for comp_msg in comparison_info[:3]:  # Показываем первые 3 попытки
-                    report.append(comp_msg)
-                if len(comparison_info) > 3:
-                    report.append("   ... и еще {} попыток".format(len(comparison_info) - 3))
     
     TransactionManager.Instance.TransactionTaskDone()
     
