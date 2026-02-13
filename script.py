@@ -109,8 +109,14 @@ else:
                 return None
             # Убираем все пробелы (в начале, в конце и внутри)
             normalized = str(sheet_num).replace(' ', '').replace('\t', '').strip()
-            # Убираем невидимые символы (zero-width spaces и т.д.)
-            normalized = ''.join(c for c in normalized if c.isprintable())
+            # Убираем невидимые символы (zero-width spaces и т.д.) - используем проверку через ord()
+            # Оставляем только цифры, точки, дефисы и обычные буквы
+            cleaned = ''
+            for c in normalized:
+                # Проверяем, что символ - это цифра, точка, дефис или обычная буква
+                if c.isdigit() or c == '.' or c == '-' or (c.isalpha() and ord(c) < 128):
+                    cleaned += c
+            normalized = cleaned
             # Если это чисто цифры - убираем ведущие нули
             if normalized.isdigit():
                 return str(int(normalized))
