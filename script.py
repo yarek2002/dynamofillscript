@@ -94,6 +94,7 @@ else:
         
         res = None
         csv_sheet_number = None  # Номер листа из CSV для отладки
+        debug_info = ""  # Отладочная информация
         for row in data_rows:
             if len(row) < 2:  # Минимум нужны столбцы A и B
                 continue
@@ -117,6 +118,12 @@ else:
                 if vk == drawing_set.lower():
                     res = col_a  # Орг.ЗамечаниеКЛисту берем из столбца A
                     csv_sheet_number = sheet_num_from_csv  # Сохраняем для отладки
+                    # Отладочная информация: показываем что в столбце A и что извлекли
+                    debug_info = " | Столбец A: '{}'".format(col_a[:100])  # Первые 100 символов
+                    if csv_sheet_number:
+                        debug_info += " | Извлечено: '{}'".format(csv_sheet_number)
+                    else:
+                        debug_info += " | Извлечено: НИЧЕГО"
                     break
             except Exception as e:
                 continue
@@ -137,6 +144,10 @@ else:
                     sheet_info += " → {}".format(match_status)
                 else:
                     sheet_info += ", CSV: не извлечен"
+                
+                # Добавляем отладочную информацию
+                if debug_info:
+                    sheet_info += debug_info
                 
                 report.append("✅ {}: Найдено '{}' | {}".format(sn, res, sheet_info))
                 # ✅ СЧИТАЕМ ТОЛЬКО ОБНОВЛЕННЫЕ ЛИСТЫ
