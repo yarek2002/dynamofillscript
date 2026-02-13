@@ -126,11 +126,12 @@ else:
                 pt.Set(res)
                 updated += 1
                 # Формируем информацию о сравнении номеров листов
-                sheet_info = "Номер листа Revit: '{}'".format(sn)
+                sn_trimmed = sn.strip()  # Обрезаем пробелы
+                sheet_info = "Номер листа Revit: '{}'".format(sn_trimmed)
                 if csv_sheet_number:
                     sheet_info += ", CSV: '{}'".format(csv_sheet_number)
                     # Нормализуем для сравнения (убираем ведущие нули)
-                    revit_num_normalized = str(int(sn)) if sn.isdigit() else sn
+                    revit_num_normalized = str(int(sn_trimmed)) if sn_trimmed.isdigit() else sn_trimmed
                     csv_num_normalized = str(int(csv_sheet_number)) if csv_sheet_number.isdigit() else csv_sheet_number
                     match_status = "✓ Совпадают" if revit_num_normalized == csv_num_normalized else "✗ НЕ совпадают"
                     sheet_info += " → {}".format(match_status)
