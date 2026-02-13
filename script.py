@@ -233,27 +233,8 @@ else:
                 pt.Set(res)
                 updated += 1
                 
-                # Формируем информацию о сравнении номеров листов
-                sheet_info = "Номер листа Revit: '{}'".format(sn_trimmed)
-                if csv_sheet_number:
-                    sheet_info += ", CSV: '{}'".format(csv_sheet_number)
-                    # Нормализуем для сравнения (убираем ведущие нули)
-                    revit_num_normalized = str(int(sn_trimmed)) if sn_trimmed.isdigit() else sn_trimmed
-                    csv_num_normalized = str(int(csv_sheet_number)) if csv_sheet_number.isdigit() else csv_sheet_number
-                    match_status = "✓ Совпадают" if revit_num_normalized == csv_num_normalized else "✗ НЕ совпадают"
-                    sheet_info += " → {}".format(match_status)
-                else:
-                    sheet_info += ", CSV: не извлечен"
-                
-                # Добавляем информацию о перезаписи, если значение было изменено
-                if current_value and current_value != res:
-                    sheet_info += " | Перезаписано: '{}' → '{}'".format(current_value[:50], res[:50])
-                
-                # Добавляем отладочную информацию
-                if debug_info:
-                    sheet_info += debug_info
-                
-                report.append("✅ {}: Найдено '{}' | {}".format(sn, res, sheet_info))
+                # Формируем упрощенный отчет
+                report.append("Найдено, номер листа: {}, вставлено: \"{}\"".format(sn_trimmed, res))
                 # ✅ СЧИТАЕМ ТОЛЬКО ОБНОВЛЕННЫЕ ЛИСТЫ
                 if p_volume:
                     volume_name = p_volume.AsString() or "Без тома"
