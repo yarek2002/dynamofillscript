@@ -225,8 +225,14 @@ else:
         
         if res:
             try:
+                # Всегда перезаписываем значение, даже если оно уже установлено
+                # Проверяем текущее значение для отладки
+                current_value = pt.AsString() if pt.HasValue else None
+                
+                # Записываем новое значение (перезаписываем существующее)
                 pt.Set(res)
                 updated += 1
+                
                 # Формируем информацию о сравнении номеров листов
                 sheet_info = "Номер листа Revit: '{}'".format(sn_trimmed)
                 if csv_sheet_number:
@@ -239,6 +245,10 @@ else:
                 else:
                     sheet_info += ", CSV: не извлечен"
                 
+                # Добавляем информацию о перезаписи, если значение было изменено
+                if current_value and current_value != res:
+                    sheet_info += " | Перезаписано: '{}' → '{}'".format(current_value[:50], res[:50])
+                
                 # Добавляем отладочную информацию
                 if debug_info:
                     sheet_info += debug_info
@@ -248,8 +258,8 @@ else:
                 if p_volume:
                     volume_name = p_volume.AsString() or "Без тома"
                     volume_counts[volume_name] = volume_counts.get(volume_name, 0) + 1
-            except:
-                report.append("⚠️ {}: Ошибка записи в параметр".format(sn))
+            except Exception as e:
+                report.append("⚠️ {}: Ошибка записи в параметр: {}".format(sn, str(e)))
         else:
             report.append("❓ {}: Ключ '{}' не найден в CSV".format(sn, vk))
     
