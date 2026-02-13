@@ -122,8 +122,9 @@ else:
         # Также создаем версию для поиска в CSV (умножаем на 10, если это просто число)
         # Например, "4" -> ищем "40" или "0040" в CSV
         revit_num_for_csv_search = None
-        if sn_trimmed.isdigit():
-            revit_num_for_csv_search = str(int(sn_trimmed) * 10).zfill(4)  # "4" -> "0040"
+        # Проверяем нормализованное значение, а не исходное (чтобы учесть удаление пробелов)
+        if revit_num_normalized and revit_num_normalized.isdigit():
+            revit_num_for_csv_search = str(int(revit_num_normalized) * 10).zfill(4)  # "4" -> "0040"
         
         for row in data_rows:
             if len(row) < 2:  # Минимум нужны столбцы A и B
