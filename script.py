@@ -35,10 +35,12 @@ def extract_sheet_number(col_a):
     """Извлекает номер листа из столбца A формата КУТ03-Р-ПИР-2-26-РД-МГ-100-ОВ01.01.00-ТЛ-0000_И_Р"""
     if not col_a:
         return None
-    # Ищем паттерн: дефис, затем 4 цифры, затем подчеркивание
-    match = re.search(r'-(\d{4})_', col_a)
-    if match:
-        return match.group(1)
+    # Ищем все паттерны: дефис, затем 4 цифры, затем подчеркивание
+    # Берем последнее совпадение (номер листа обычно в конце)
+    matches = list(re.finditer(r'-(\d{4})_', col_a))
+    if matches:
+        # Берем последнее совпадение
+        return matches[-1].group(1)
     return None
 
 def extract_drawing_set(col_b):
