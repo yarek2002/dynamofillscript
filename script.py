@@ -141,21 +141,20 @@ else:
                     res = col_a  # Орг.ЗамечаниеКЛисту берем из столбца A
                     csv_sheet_number = sheet_num_from_csv  # Сохраняем для отладки
                     break
+            except Exception as e:
+                continue
         
         # Добавляем информацию о всех найденных совпадениях
         if found_matches:
             debug_info += " | Всего совпадений: {}".format(len(found_matches))
             if len(found_matches) > 1:
                 debug_info += " | Номера листов: {}".format([m['sheet_num'] for m in found_matches])
-            except Exception as e:
-                continue
         
         if res:
             try:
                 pt.Set(res)
                 updated += 1
                 # Формируем информацию о сравнении номеров листов
-                sn_trimmed = sn.strip()  # Обрезаем пробелы
                 sheet_info = "Номер листа Revit: '{}'".format(sn_trimmed)
                 if csv_sheet_number:
                     sheet_info += ", CSV: '{}'".format(csv_sheet_number)
