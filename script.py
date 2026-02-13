@@ -97,6 +97,8 @@ else:
         res = None
         csv_sheet_number = None  # Номер листа из CSV для отладки
         debug_info = ""  # Отладочная информация
+        sn_trimmed = sn.strip()  # Обрезаем пробелы из номера листа Revit
+        found_matches = []  # Для отладки: все найденные совпадения
         for row in data_rows:
             if len(row) < 2:  # Минимум нужны столбцы A и B
                 continue
@@ -118,15 +120,33 @@ else:
                 
                 # Сравниваем с ключом из Revit (без учета регистра)
                 if vk == drawing_set.lower():
-                    res = col_a  # Орг.ЗамечаниеКЛисту берем из столбца A
-                    csv_sheet_number = sheet_num_from_csv  # Сохраняем для отладки
+                    # Сохраняем все найденные совпадения для отладки
+                    found_matches.append({
+                        'col_a': col_a[:80],
+                        'sheet_num': sheet_num_from_csv
+                    })
+                    
                     # Отладочная информация: показываем что в столбце A и что извлекли
                     debug_info = " | Столбец A: '{}'".format(col_a[:100])  # Первые 100 символов
-                    if csv_sheet_number:
-                        debug_info += " | Извлечено: '{}'".format(csv_sheet_number)
+                    if sheet_num_from_csv:
+                        debug_info += " | Извлечено из CSV: '{}'".format(sheet_num_from_csv)
+                        # Нормализуем для сравнения
+                        revit_num_normalized = str(int(sn_trimmed)) if sn_trimmed.isdigit() else sn_trimmed
+                        csv_num_normalized = str(int(sheet_num_from_csv)) if sheet_num_from_csv.isdigit() else sheet_num_from_csv
+                        debug_info += " | Revit: '{}' (норм: '{}') vs CSV: '{}' (норм: '{}')".format(
+                            sn_trimmed, revit_num_normalized, sheet_num_from_csv, csv_num_normalized)
                     else:
                         debug_info += " | Извлечено: НИЧЕГО"
+                    
+                    res = col_a  # Орг.ЗамечаниеКЛисту берем из столбца A
+                    csv_sheet_number = sheet_num_from_csv  # Сохраняем для отладки
                     break
+        
+        # Добавляем информацию о всех найденных совпадениях
+        if found_matches:
+            debug_info += " | Всего совпадений: {}".format(len(found_matches))
+            if len(found_matches) > 1:
+                debug_info += " | Номера листов: {}".format([m['sheet_num'] for m in found_matches])
             except Exception as e:
                 continue
         
