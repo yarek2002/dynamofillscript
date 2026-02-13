@@ -101,8 +101,29 @@ else:
         found_matches = []  # Для отладки: все найденные совпадения
         first_match = None  # Первое совпадение по комплекту чертежей
         
+        # Функция нормализации номера листа для сравнения
+        def normalize_sheet_number(sheet_num):
+            """Нормализует номер листа для сравнения"""
+            if not sheet_num:
+                return None
+            # Убираем пробелы
+            normalized = str(sheet_num).strip()
+            # Если это чисто цифры - убираем ведущие нули
+            if normalized.isdigit():
+                return str(int(normalized))
+            # Если есть точка (например, "21.3"), извлекаем числовую часть
+            # Для сравнения: "21.3" может соответствовать "0213" или "2130" в CSV
+            # Пока оставляем как есть для точного сравнения
+            return normalized
+        
         # Нормализуем номер листа из Revit для сравнения
-        revit_num_normalized = str(int(sn_trimmed)) if sn_trimmed.isdigit() else sn_trimmed
+        revit_num_normalized = normalize_sheet_number(sn_trimmed)
+        
+        # Также создаем версию для поиска в CSV (умножаем на 10, если это просто число)
+        # Например, "4" -> ищем "40" или "0040" в CSV
+        revit_num_for_csv_search = None
+        if sn_trimmed.isdigit():
+            revit_num_for_csv_search = str(int(sn_trimmed) * 10).zfill(4)  # "4" -> "0040"
         
         for row in data_rows:
             if len(row) < 2:  # Минимум нужны столбцы A и B
@@ -141,9 +162,24 @@ else:
                     
                     # Проверяем совпадение номеров листов
                     if sheet_num_from_csv:
-                        csv_num_normalized = str(int(sheet_num_from_csv)) if sheet_num_from_csv.isdigit() else sheet_num_from_csv
-                        # Если номера листов совпадают - это точное совпадение, берем его
+                        csv_num_normalized = normalize_sheet_number(sheet_num_from_csv)
+                        # Сравниваем нормализованные значения
+                        match_found = False
+                        
+                        # Вариант 1: прямое сравнение нормализованных значений
                         if revit_num_normalized == csv_num_normalized:
+                            match_found = True
+                        # Вариант 2: если номер Revit - просто число, проверяем умноженный на 10 вариант
+                        elif revit_num_for_csv_search:
+                            # Сравниваем с исходным форматом CSV (с ведущими нулями)
+                            if revit_num_for_csv_search == sheet_num_from_csv:
+                                match_found = True
+                            # Или сравниваем нормализованные версии
+                            elif csv_num_normalized == normalize_sheet_number(revit_num_for_csv_search):
+                                match_found = True
+                        
+                        # Если номера листов совпадают - это точное совпадение, берем его
+                        if match_found:
                             res = col_a
                             csv_sheet_number = sheet_num_from_csv
                             debug_info = " | Столбец A: '{}' | Точное совпадение по номеру листа!".format(col_a[:100])
