@@ -83,73 +83,70 @@ else:
     # НОВОЕ: словарь для подсчета листов по томам
     volume_counts = {}
     
-    TransactionManager.Instance.EnsureInTransaction(doc)
-    
+    # Создаем словарь для быстрого поиска листов по комплекту чертежей и номеру листа
+    sheets_dict = {}
     for s in sheets:
         sn = s.SheetNumber
         tb = tb_map.get(sn)
         
-        # Ищем параметры (в листе или в рамке)
+        # Ищем параметр комплекта чертежей (в листе или в рамке)
         pk = get_p(s, KEY_NAME) or get_p(tb, KEY_NAME)
-        pt = get_p(s, TARGET_NAME) or get_p(tb, TARGET_NAME)
-        p_volume = get_p(s, "ADSK_Штамп Раздел проекта") or get_p(tb, "ADSK_Штамп Раздел проекта")
-        
-        if not pk or not pt:
+        if pk:
+            vk = (pk.AsString() or "").strip().lower()
+            vk = vk.replace('⠀', '')
+            if vk:
+                # Нормализуем номер листа для ключа
+                normalized_sn = normalize_sheet_number(sn)
+                key = (vk, normalized_sn)
+                if key not in sheets_dict:
+                    sheets_dict[key] = []
+                sheets_dict[key].append((s, tb))
+    
+    TransactionManager.Instance.EnsureInTransaction(doc)
+    
+    # Идем по CSV и ищем соответствующие листы
+    for row in data_rows:
+        if len(row) < 2:  # Минимум нужны столбцы A и B
             continue
         
-        # Ключ из Revit (например, ОВ02.02.02)
-        vk = (pk.AsString() or "").strip().lower()
-        vk = vk.replace('⠀', '')
-        if not vk:
-            continue
-        
-        # Нормализуем номер листа из Revit для сравнения
-        revit_sheet_num = normalize_sheet_number(sn)
-        
-        res = None
-        for row in data_rows:
-            if len(row) < 2:  # Минимум нужны столбцы A и B
+        try:
+            col_a = str(row[0]).strip()  # Столбец A: Орг.ЗамечаниеКЛисту и номер листа
+            col_b = str(row[1]).strip()  # Столбец B: ADSK_Комплект чертежей
+            
+            if not col_a or not col_b:
                 continue
             
-            try:
-                col_a = str(row[0]).strip()  # Столбец A: Орг.ЗамечаниеКЛисту и номер листа
-                col_b = str(row[1]).strip()  # Столбец B: ADSK_Комплект чертежей
-                
-                if not col_a or not col_b:
-                    continue
-                
-                # Извлекаем номер листа из столбца A
-                csv_sheet_num = extract_sheet_number(col_a)
-                csv_sheet_num_normalized = normalize_sheet_number(csv_sheet_num) if csv_sheet_num else None
-                
-                # Извлекаем комплект чертежей из столбца B
-                drawing_set = extract_drawing_set(col_b)
-                if not drawing_set:
-                    continue
-                
-                # Сравниваем и комплект чертежей, и номер листа
-                drawing_set_match = (vk == drawing_set.lower())
-                sheet_num_match = (revit_sheet_num == csv_sheet_num_normalized) if csv_sheet_num_normalized else False
-                
-                if drawing_set_match and sheet_num_match:
-                    res = col_a  # Орг.ЗамечаниеКЛисту берем из столбца A
-                    break
-            except Exception as e:
+            # Извлекаем номер листа из столбца A (например, "0120")
+            csv_sheet_num = extract_sheet_number(col_a)
+            csv_sheet_num_normalized = normalize_sheet_number(csv_sheet_num) if csv_sheet_num else None
+            
+            # Извлекаем комплект чертежей из столбца B (например, "ОВ01.01.00")
+            drawing_set = extract_drawing_set(col_b)
+            if not drawing_set or not csv_sheet_num_normalized:
                 continue
-        
-        if res:
-            try:
-                pt.Set(res)
-                updated += 1
-                report.append("✅ {}: Найдено '{}'".format(sn, res))
-                # ✅ СЧИТАЕМ ТОЛЬКО ОБНОВЛЕННЫЕ ЛИСТЫ
-                if p_volume:
-                    volume_name = p_volume.AsString() or "Без тома"
-                    volume_counts[volume_name] = volume_counts.get(volume_name, 0) + 1
-            except:
-                report.append("⚠️ {}: Ошибка записи в параметр".format(sn))
-        else:
-            report.append("❓ {}: Ключ '{}' не найден в CSV".format(sn, vk))
+            
+            # Ищем листы с соответствующими параметрами
+            search_key = (drawing_set.lower(), csv_sheet_num_normalized)
+            matching_sheets = sheets_dict.get(search_key, [])
+            
+            for s, tb in matching_sheets:
+                sn = s.SheetNumber
+                pt = get_p(s, TARGET_NAME) or get_p(tb, TARGET_NAME)
+                p_volume = get_p(s, "ADSK_Штамп Раздел проекта") or get_p(tb, "ADSK_Штамп Раздел проекта")
+                
+                if pt:
+                    try:
+                        pt.Set(col_a)  # Записываем значение из столбца A
+                        updated += 1
+                        report.append("✅ {}: Найдено '{}'".format(sn, col_a))
+                        # ✅ СЧИТАЕМ ТОЛЬКО ОБНОВЛЕННЫЕ ЛИСТЫ
+                        if p_volume:
+                            volume_name = p_volume.AsString() or "Без тома"
+                            volume_counts[volume_name] = volume_counts.get(volume_name, 0) + 1
+                    except:
+                        report.append("⚠️ {}: Ошибка записи в параметр".format(sn))
+        except Exception as e:
+            continue
     
     TransactionManager.Instance.TransactionTaskDone()
     
